@@ -1,0 +1,66 @@
+alias: Melding bij detectie Camera deurbel (AI)
+description: ""
+triggers:
+  - type: turned_on
+    device_id: 
+    entity_id: 
+    domain: binary_sensor
+    trigger: device
+conditions:
+  - condition: and
+    conditions:
+      - condition: time
+        after: "04:30:00"
+        before: "23:00:00"
+actions:
+  - alias: Camera - Deurbel - Snapshot, AI & Notification
+    sequence:
+      - action: camera.snapshot
+        target:
+          entity_id: camera.deurbel_voordeur_vloeiend
+        data:
+          filename: /config/www/reolink_snapshot/snapshot_doorbell1.jpg
+        enabled: true
+  - action: llmvision.stream_analyzer
+        metadata: {}
+        data:
+          duration: 3
+          max_frames: 8
+          include_filename: true
+          target_width: 1280
+          max_tokens: 100
+          provider: 
+          message: >-
+            De achtertuin camera heeft beweging gedetecteerd. Beschrijf op een
+            grappige  manier aan de hand van de beelden wat er staat. Beschrijf
+            geen stilstaande objecten of gebouwen of struiken. Als het een
+            voorbijganger betreft of niemand gezien, antwoord dan alleen
+            "Voorbijganger". Je bericht moet kort genoeg zijn om in een
+            telefoonmelding te passen.
+          image_entity:
+            - camera.deurbel_voordeur_vloeiend
+          generate_title: false
+          expose_images: false
+        response_variable: output_llm
+      - if:
+          - condition: template
+            value_template: "{{ 'Voorbijganger' in output_llm.text }}"
+        then:
+          - stop: Voorbijganger gezien, geen melding naar telefoons
+        else:
+          - action: notify.mobile_app_
+            data:
+              message: "{{ generated_content['text'] }}"
+              data:
+                image: /local/reolink_snapshot/snapshot_doorbell1.jpg
+                url: homeassistant://navigate/dashboard-deurbel/0
+              title: Deurbel heeft iemand gezien
+            enabled: false
+          - alias: Stuur via Telegram naar George
+            action: telegram_bot.send_photo
+            data:
+              authentication: digest
+              config_entry_id: 
+              caption: "{{ output_llm ['text'] }}"
+              file: /config/www/reolink_snapshot/snapshot_doorbell1.jpg
+mode: single
