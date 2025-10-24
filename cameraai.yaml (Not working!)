@@ -19,48 +19,64 @@ actions:
         target:
           entity_id: camera.deurbel_voordeur_vloeiend
         data:
-          filename: /config/www/reolink_snapshot/snapshot_doorbell1.jpg
+          filename: /config/media/snapshots/snapshot_doorbell1.jpg
         enabled: true
-  - action: llmvision.stream_analyzer
+      - delay:
+          milliseconds: 500
+        enabled: true
+      - action: camera.snapshot
+        target:
+          entity_id: camera.deurbel_voordeur_vloeiend
+        data:
+          filename: /config/media/snapshots/snapshot_doorbell2.jpg
+        enabled: true
+      - delay:
+          milliseconds: 500
+        enabled: true
+      - action: camera.snapshot
+        target:
+          entity_id: camera.deurbel_voordeur_vloeiend
+        data:
+          filename: /config/media/snapshots/snapshot_doorbell3.jpg
+        enabled: true
+      - action: llmvision.image_analyzer
         metadata: {}
         data:
-          duration: 3
-          max_frames: 8
+          remember: false
+          use_memory: false
           include_filename: true
           target_width: 1280
           max_tokens: 100
+          generate_title: false
+          expose_images: true
           provider: 
           message: >-
-            De achtertuin camera heeft beweging gedetecteerd. Beschrijf op een
-            grappige  manier aan de hand van de beelden wat er staat. Beschrijf
-            geen stilstaande objecten of gebouwen of struiken. Als het een
-            voorbijganger betreft of niemand gezien, antwoord dan alleen
+            De deurbel camera heeft beweging gedetecteerd. Beschrijf op een
+            grappige manier aan de hand van de beelden wat er staat. 
+
+            Beschrijf geen stilstaande objecten of gebouwen of struiken. Als het
+            een voorbijganger betreft of niemand gezien, antwoord dan alleen
             "Voorbijganger". Je bericht moet kort genoeg zijn om in een
             telefoonmelding te passen.
+          image_file: |-
+            /config/media/snapshots/snapshot_doorbell1.jpg
+            /config/media/snapshots/snapshot_doorbell2.jpg
+            /config/media/snapshots/snapshot_doorbell3.jpg
+          model: Video Snapshot Sequence Analysis
           image_entity:
             - camera.deurbel_voordeur_vloeiend
-          generate_title: false
-          expose_images: false
-        response_variable: output_llm
+        response_variable: output
       - if:
           - condition: template
-            value_template: "{{ 'Voorbijganger' in output_llm.text }}"
+            value_template: "{{ 'Voorbijganger' in output.text }}"
         then:
           - stop: Voorbijganger gezien, geen melding naar telefoons
         else:
-          - action: notify.mobile_app_
-            data:
-              message: "{{ generated_content['text'] }}"
-              data:
-                image: /local/reolink_snapshot/snapshot_doorbell1.jpg
-                url: homeassistant://navigate/dashboard-deurbel/0
-              title: Deurbel heeft iemand gezien
-            enabled: false
           - alias: Stuur via Telegram naar George
             action: telegram_bot.send_photo
             data:
               authentication: digest
               config_entry_id: 
-              caption: "{{ output_llm ['text'] }}"
-              file: /config/www/reolink_snapshot/snapshot_doorbell1.jpg
+              caption: "{{ output['text'] }}"
+              file: /config/media/snapshots/snapshot_doorbell1.jpg
 mode: single
